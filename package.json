@@ -1,0 +1,51 @@
+{
+  "name": "nft-marketplace",
+  "version": "1.0.0",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "hardhat test",
+    "compile": "hardhat compile",
+    "deploy:testnet": "hardhat run scripts/deploy-testnet.ts --network testnet",
+    "deploy:mainnet": "hardhat run scripts/deploy-mainnet.ts --network mainnet",
+    "verify": "hardhat verify",
+    "audit": "npm audit fix",
+    "clean": "rm -rf node_modules package-lock.json",
+    "reinstall": "npm run clean && npm install",
+    "deploy:vana": "hardhat run scripts/deploy-mainnet.ts --network vana_mainnet",
+    "deploy:vana-testnet": "hardhat run scripts/deploy-testnet.ts --network vana_testnet",
+    "verify:vana": "hardhat verify --network vana_mainnet",
+    "verify:vana-testnet": "hardhat verify --network vana_testnet"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@openzeppelin/hardhat-upgrades": "^3.0.0",
+    "@types/chai": "^4.3.7",
+    "@types/mocha": "^10.0.0",
+    "@types/node": "^20.0.0",
+    "axios": "^1.7.9",
+    "chai": "^4.3.7",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.19.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.3",
+    "@openzeppelin/contracts-upgradeable": "^4.9.3",
+    "ethers": "^6.1.0",
+    "react-icons": "^5.4.0"
+  },
+  "overrides": {
+    "glob": "^9.0.0"
+  },
+  "resolutions": {
+    "glob": "^9.0.0"
+  }
+}
