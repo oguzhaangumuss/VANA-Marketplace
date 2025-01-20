@@ -1,0 +1,216 @@
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { VanaMarketplace, VanaNFTCollection } from "../typechain-types/contracts";
+
+describe("VanaMarketplace", function () {
+    let marketplace: VanaMarketplace;
+    let nftCollection: VanaNFTCollection;
+    let owner: SignerWithAddress;
+    let seller: SignerWithAddress;
+    let buyer: SignerWithAddress;
+    let royaltyReceiver: SignerWithAddress;
+
+    const platformFee = 250; // 2.5%
+    const tokenId = 1;
+    const price = ethers.parseEther("1"); // 1 VANA
+
+    beforeEach(async function () {
+        [owner, seller, buyer, royaltyReceiver] = await ethers.getSigners();
+
+        // Deploy NFT collection
+        const VanaNFTCollection = await ethers.getContractFactory("VanaNFTCollection");
+        nftCollection = (await VanaNFTCollection.deploy(
+            "Test NFT",
+            "TEST",
+            1000,
+            "https://api.test.com/",
+            "ipfs://hidden/",
+            ethers.ZeroHash,
+            royaltyReceiver.address,
+            250 // 2.5% royalty
+        )) as unknown as VanaNFTCollection;
+
+        // Deploy marketplace
+        const VanaMarketplace = await ethers.getContractFactory("VanaMarketplace");
+        marketplace = (await VanaMarketplace.deploy(platformFee)) as unknown as VanaMarketplace;
+
+        // Mint NFT to seller
+        await nftCollection.connect(owner).mint(seller.address);
+    });
+
+    describe("Listing", function () {
+        it("Should allow listing NFT", async function () {
+            // Approve marketplace
+            await nftCollection.connect(seller).approve(marketplace.target, tokenId);
+
+            // List NFT
+            const tx = await marketplace.connect(seller).listNFT(
+                nftCollection.target,
+                tokenId,
+                price
+            );
+
+            const receipt = await tx.wait();
+            const event = receipt?.logs.find(
+                log => log.topics[0] === ethers.id(
+                    "Listed(address,address,uint256,bytes32,uint256)"
+                )
+            );
+            if (!event) throw new Error("Event not found");
+            const listingId = event.args?.[3];
+
+            const listing = await marketplace.getListing(listingId);
+            expect(listing.seller).to.equal(seller.address);
+            expect(listing.nftContract).to.equal(nftCollection.target);
+            expect(listing.tokenId).to.equal(tokenId);
+            expect(listing.price).to.equal(price);
+            expect(listing.active).to.be.true;
+        });
+
+        it("Should not allow listing without approval", async function () {
+            await expect(
+                marketplace.connect(seller).listNFT(
+                    nftCollection.target,
+                    tokenId,
+                    price
+                )
+            ).to.be.revertedWith("Marketplace not approved");
+        });
+    });
+
+    describe("Admin Functions", function () {
+        it("Should allow emergency withdrawal", async function () {
+            // Send some ETH to contract
+            await owner.sendTransaction({
+                to: marketplace.target,
+                value: ethers.parseEther("1.0")
+            });
+            
+            const initialBalance = await ethers.provider.getBalance(owner.address);
+            await marketplace.emergencyWithdraw();
+            const finalBalance = await ethers.provider.getBalance(owner.address);
+            
+            expect(finalBalance).to.be.gt(initialBalance);
+        });
+
+        it("Should allow admin to set verified collection", async function () {
+            await marketplace.setVerifiedCollection(nftCollection.target, true);
+            expect(await marketplace.verifiedCollections(nftCollection.target)).to.be.true;
+        });
+
+        it("Should not allow non-admin to set verified collection", async function () {
+            await expect(
+                marketplace.connect(seller).setVerifiedCollection(nftCollection.target, true)
+            ).to.be.revertedWith(
+                `AccessControl: account ${seller.address.toLowerCase()} is missing role ${await marketplace.ADMIN_ROLE()}`
+            );
+        });
+    });
+
+    describe("Buying", function () {
+        let listingId: string;
+
+        beforeEach(async function () {
+            await nftCollection.connect(seller).approve(marketplace.target, tokenId);
+            const tx = await marketplace.connect(seller).listNFT(
+                nftCollection.target,
+                tokenId,
+                price
+            );
+            const receipt = await tx.wait();
+            const event = receipt?.logs.find(
+                log => log.topics[0] === ethers.id(
+                    "Listed(address,address,uint256,bytes32,uint256)"
+                )
+            );
+            if (!event) throw new Error("Event not found");
+            listingId = event.args?.[3];
+        });
+
+        it("Should allow buying NFT", async function () {
+            const initialSellerBalance = await ethers.provider.getBalance(seller.address);
+            
+            await marketplace.connect(buyer).buyNFT(listingId, { value: price });
+            
+            expect(await nftCollection.ownerOf(tokenId)).to.equal(buyer.address);
+            
+            const finalSellerBalance = await ethers.provider.getBalance(seller.address);
+            // Calculate expected profit:
+            // Total price - platform fee - royalty fee
+            const platformAmount = (price * BigInt(platformFee)) / BigInt(10000); // 2.5%
+            const royaltyAmount = (price * BigInt(250)) / BigInt(10000); // 2.5%
+            const expectedSellerProfit = price - platformAmount - royaltyAmount;
+            expect(finalSellerBalance - initialSellerBalance).to.equal(expectedSellerProfit);
+        });
+
+        it("Should distribute royalties correctly", async function () {
+            const initialRoyaltyBalance = await ethers.provider.getBalance(royaltyReceiver.address);
+            
+            await marketplace.connect(buyer).buyNFT(listingId, { value: price });
+            
+            const finalRoyaltyBalance = await ethers.provider.getBalance(royaltyReceiver.address);
+            const expectedRoyalty = (price * BigInt(250)) / BigInt(10000); // 2.5%
+            expect(finalRoyaltyBalance - initialRoyaltyBalance).to.equal(expectedRoyalty);
+        });
+    });
+
+    describe("Batch Operations", function () {
+        const tokenId2 = 2;
+        const price2 = ethers.parseEther("0.5");
+
+        beforeEach(async function () {
+            // Mint second NFT to seller
+            await nftCollection.connect(owner).mint(seller.address);
+        });
+
+        it("Should allow batch listing NFTs", async function () {
+            await nftCollection.connect(seller).approve(marketplace.target, tokenId);
+            await nftCollection.connect(seller).approve(marketplace.target, tokenId2);
+
+            const tx = await marketplace.connect(seller).batchListNFTs(
+                [nftCollection.target, nftCollection.target],
+                [tokenId, tokenId2],
+                [price, price2]
+            );
+
+            const receipt = await tx.wait();
+            const events = receipt?.logs.filter(
+                log => log.topics[0] === ethers.id(
+                    "Listed(address,address,uint256,bytes32,uint256)"
+                )
+            );
+
+            expect(events?.length).to.equal(2);
+        });
+
+        it("Should allow batch buying NFTs", async function () {
+            // List NFTs first
+            await nftCollection.connect(seller).approve(marketplace.target, tokenId);
+            await nftCollection.connect(seller).approve(marketplace.target, tokenId2);
+
+            const listTx = await marketplace.connect(seller).batchListNFTs(
+                [nftCollection.target, nftCollection.target],
+                [tokenId, tokenId2],
+                [price, price2]
+            );
+
+            const receipt = await listTx.wait();
+            const events = receipt?.logs.filter(
+                log => log.topics[0] === ethers.id(
+                    "Listed(address,address,uint256,bytes32,uint256)"
+                )
+            );
+
+            if (!events || events.length !== 2) throw new Error("Listing events not found");
+            const listingIds = events.map(event => event.args?.[3]);
+
+            // Buy NFTs
+            const totalPrice = price + price2;
+            await marketplace.connect(buyer).batchBuyNFTs(listingIds, { value: totalPrice });
+
+            expect(await nftCollection.ownerOf(tokenId)).to.equal(buyer.address);
+            expect(await nftCollection.ownerOf(tokenId2)).to.equal(buyer.address);
+        });
+    });
+}); 

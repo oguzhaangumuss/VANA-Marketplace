@@ -1,0 +1,30 @@
+{
+"rpc": "rpc123", //rpc url
+"network": "pacific-1", //testnet yada mainnet
+"name": "deneme1", //koleksiyon adı
+"description": "", //koleksiyon açıklaması
+"supply": 1001, //koleksiyon arzı
+"token_uri": "", //koleksiyon token uri
+"royalty_percent": 5, //royalty yüzdesi
+"royalty_wallet": "123456789", //royalty wallet adresi
+"iterated_uri": false, // Bu ne demek bilmiyorum
+"hidden_metadata": false, //metadata gizli mi
+"placeholder_token_uri": null, //placeholder token uri
+"groups": [ //Mint grupları
+    {
+        "name": "public", //grup adı
+        "merkle_root": null, //merkle root
+        "max_tokens": 0, //bu grup için maksimum token sayısı
+        "unit_price": 1, //mint fiyatı
+        "mintPerWallet": 2,  // <- Her cüzdan max 2 mint yapabilir
+        "creators": [ //yönetici bilgileri
+            {
+                "address": "123456780", //yönetici adresi
+                "share": 100 //yönetici payı
+            }
+        ],
+        "start_time": "2024-12-29T16:20:05Z", //mint başlangıç zamanı
+        "end_time": null //mint bitiş zamanı
+    }
+]
+}

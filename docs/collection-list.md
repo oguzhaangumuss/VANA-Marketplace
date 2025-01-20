@@ -1,0 +1,1 @@
+0x842523F4c6c2C35Ad398136a82Ac73BC04C0Bd11 - main test collection with VanaNFTContract

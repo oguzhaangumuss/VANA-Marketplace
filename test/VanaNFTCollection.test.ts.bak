@@ -1,0 +1,230 @@
+import { expect } from "chai";
+import { ethers } from "hardhat";
+import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { VanaNFTCollection } from "../typechain-types/contracts/VanaNFTCollection";
+import { keccak256 } from "ethers";
+import MerkleTree from 'merkletreejs';
+
+describe("VanaNFTCollection", function () {
+    let nftCollection: VanaNFTCollection;
+    let owner: SignerWithAddress;
+    let minter: SignerWithAddress;
+    let user: SignerWithAddress;
+    let merkleTree: MerkleTree;
+    let merkleRoot: string;
+    let merkleProof: string[];
+    let royaltyReceiver: SignerWithAddress;
+    const royaltyFee = 250; // 2.5% (basis points)
+
+    const name = "Vana NFT";
+    const symbol = "VNFT";
+    const maxSupply = 1000;
+    const baseURI = "https://api.vana.org/metadata/";
+    const hiddenUri = "ipfs://hidden-metadata/";
+
+    beforeEach(async function () {
+        [owner, minter, user, royaltyReceiver] = await ethers.getSigners();
+
+        // Create merkle tree
+        const whitelistAddresses = [
+            owner.address,
+            minter.address,
+            user.address
+        ];
+        
+        const leafNodes = whitelistAddresses.map(addr => 
+            keccak256(Buffer.from(addr.slice(2), 'hex'))
+        );
+        merkleTree = new MerkleTree(leafNodes, keccak256, { sortPairs: true });
+        merkleRoot = `0x${merkleTree.getRoot().toString('hex')}`;
+        
+        // Deploy contract
+        const VanaNFTCollectionFactory = await ethers.getContractFactory("VanaNFTCollection");
+        nftCollection = (await VanaNFTCollectionFactory.deploy(
+            name, 
+            symbol, 
+            maxSupply, 
+            baseURI,
+            hiddenUri,
+            merkleRoot,
+            royaltyReceiver.address,
+            royaltyFee
+        )) as unknown as VanaNFTCollection;
+        await nftCollection.waitForDeployment();
+    });
+
+    describe("Deployment", function () {
+        it("Should set the correct name and symbol", async function () {
+            expect(await nftCollection.name()).to.equal(name);
+            expect(await nftCollection.symbol()).to.equal(symbol);
+        });
+
+        it("Should set the correct max supply", async function () {
+            expect(await nftCollection.maxSupply()).to.equal(maxSupply);
+        });
+
+        it("Should grant roles to deployer", async function () {
+            const adminRole = await nftCollection.DEFAULT_ADMIN_ROLE();
+            const minterRole = await nftCollection.MINTER_ROLE();
+            
+            expect(await nftCollection.hasRole(adminRole, owner.address)).to.be.true;
+            expect(await nftCollection.hasRole(minterRole, owner.address)).to.be.true;
+        });
+    });
+
+    describe("Minting", function () {
+        it("Should allow minter to mint NFTs", async function () {
+            await nftCollection.mint(user.address);
+            expect(await nftCollection.balanceOf(user.address)).to.equal(1);
+        });
+
+        it("Should not allow non-minter to mint NFTs", async function () {
+            await expect(
+                nftCollection.connect(user).mint(user.address)
+            ).to.be.revertedWith(
+                `AccessControl: account ${user.address.toLowerCase()} is missing role ${await nftCollection.MINTER_ROLE()}`
+            );
+        });
+
+        it("Should not allow minting beyond max supply", async function () {
+            const smallMaxSupply = 2;
+            const VanaNFTCollectionFactory = await ethers.getContractFactory("VanaNFTCollection");
+            const newCollection = (await VanaNFTCollectionFactory.deploy(
+                name, 
+                symbol, 
+                smallMaxSupply, 
+                baseURI,
+                hiddenUri,
+                `0x${merkleTree.getRoot().toString('hex')}`,
+                royaltyReceiver.address,
+                royaltyFee
+            )) as unknown as VanaNFTCollection;
+
+            await newCollection.mint(user.address);
+            await newCollection.mint(user.address);
+            await expect(
+                newCollection.mint(user.address)
+            ).to.be.revertedWith("Max supply reached");
+        });
+    });
+
+    describe("Metadata Management", function () {
+        beforeEach(async function () {
+            [owner, minter, user, royaltyReceiver] = await ethers.getSigners();
+            
+            const VanaNFTCollectionFactory = await ethers.getContractFactory("VanaNFTCollection");
+            nftCollection = (await VanaNFTCollectionFactory.deploy(
+                name, 
+                symbol, 
+                maxSupply, 
+                baseURI,
+                hiddenUri,
+                merkleRoot,
+                royaltyReceiver.address,
+                royaltyFee
+            )) as unknown as VanaNFTCollection;
+            await nftCollection.waitForDeployment();
+        });
+
+        it("Should return hidden URI when not revealed", async function () {
+            await nftCollection.mint(user.address);
+            const tokenId = 1;
+            expect(await nftCollection.tokenURI(tokenId)).to.equal(hiddenUri);
+        });
+
+        it("Should return real URI after reveal", async function () {
+            await nftCollection.mint(user.address);
+            const tokenId = 1;
+            
+            await nftCollection.reveal();
+            expect(await nftCollection.tokenURI(tokenId)).to.equal(baseURI + tokenId.toString());
+        });
+
+        it("Should not allow non-admin to reveal", async function () {
+            await expect(
+                nftCollection.connect(user).reveal()
+            ).to.be.revertedWith(
+                `AccessControl: account ${user.address.toLowerCase()} is missing role ${await nftCollection.ADMIN_ROLE()}`
+            );
+        });
+
+        it("Should not allow revealing twice", async function () {
+            await nftCollection.reveal();
+            await expect(
+                nftCollection.reveal()
+            ).to.be.revertedWith("Collection already revealed");
+        });
+
+        it("Should allow admin to change hidden metadata URI", async function () {
+            const newHiddenUri = "ipfs://new-hidden/";
+            await nftCollection.setHiddenMetadataUri(newHiddenUri);
+            expect(await nftCollection.hiddenMetadataUri()).to.equal(newHiddenUri);
+        });
+    });
+
+    describe("Whitelist Minting", function () {
+        beforeEach(async function () {
+            merkleProof = merkleTree.getHexProof(keccak256(Buffer.from(user.address.slice(2), 'hex')));
+        });
+
+        it("Should allow whitelisted address to mint", async function () {
+            await nftCollection.connect(user).whitelistMint(merkleProof);
+            expect(await nftCollection.balanceOf(user.address)).to.equal(1);
+        });
+
+        it("Should not allow double minting", async function () {
+            await nftCollection.connect(user).whitelistMint(merkleProof);
+            await expect(
+                nftCollection.connect(user).whitelistMint(merkleProof)
+            ).to.be.revertedWith("Address already minted");
+        });
+
+        it("Should not allow non-whitelisted address to mint", async function () {
+            const [_, __, ___, nonWhitelisted] = await ethers.getSigners();
+            const invalidProof = merkleTree.getHexProof(keccak256(Buffer.from(nonWhitelisted.address.slice(2), 'hex')));
+            
+            await expect(
+                nftCollection.connect(nonWhitelisted).whitelistMint(invalidProof)
+            ).to.be.revertedWith("Invalid merkle proof");
+        });
+    });
+
+    describe("Royalty System", function () {
+        const tokenId = 1;
+        const salePrice = ethers.parseEther("1"); // 1 VANA
+        
+        beforeEach(async function () {
+            await nftCollection.mint(user.address);
+        });
+
+        it("Should set correct initial royalty info", async function () {
+            const [receiver, amount] = await nftCollection.royaltyInfo(tokenId, salePrice);
+            expect(receiver).to.equal(royaltyReceiver.address);
+            expect(amount).to.equal((salePrice * BigInt(royaltyFee)) / BigInt(10000));
+        });
+
+        it("Should allow admin to update royalty info", async function () {
+            const newReceiver = user.address;
+            const newFee = 500; // 5%
+            
+            await nftCollection.setRoyaltyInfo(newReceiver, newFee);
+            
+            const [receiver, amount] = await nftCollection.royaltyInfo(tokenId, salePrice);
+            expect(receiver).to.equal(newReceiver);
+            expect(amount).to.equal((salePrice * BigInt(newFee)) / BigInt(10000));
+        });
+
+        it("Should not allow non-admin to update royalty info", async function () {
+            await expect(
+                nftCollection.connect(user).setRoyaltyInfo(user.address, 500)
+            ).to.be.revertedWith(
+                `AccessControl: account ${user.address.toLowerCase()} is missing role ${await nftCollection.ADMIN_ROLE()}`
+            );
+        });
+
+        it("Should support ERC2981 interface", async function () {
+            const interfaceId = "0x2a55205a"; // ERC2981 interface ID
+            expect(await nftCollection.supportsInterface(interfaceId)).to.be.true;
+        });
+    });
+}); 

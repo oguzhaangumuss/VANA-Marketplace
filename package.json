@@ -8,16 +8,30 @@
   "scripts": {
     "test": "hardhat test",
     "compile": "hardhat compile",
-    "deploy:testnet": "hardhat run scripts/deploy-testnet.ts --network testnet",
-    "deploy:mainnet": "hardhat run scripts/deploy-mainnet.ts --network mainnet",
-    "verify": "hardhat verify",
+    "deploy:testnet": "hardhat run scripts/deploy-testnet.ts --network vana_testnet",
+    "deploy:mainnet": "hardhat run scripts/deploy-mainnet.ts --network vana_mainnet",
+    "verify": "hardhat run scripts/verify.ts --network vana_testnet",
+    "verify:mainnet": "hardhat run scripts/verify-contract.ts --network vana_mainnet",
     "audit": "npm audit fix",
     "clean": "rm -rf node_modules package-lock.json",
     "reinstall": "npm run clean && npm install",
     "deploy:vana": "hardhat run scripts/deploy-mainnet.ts --network vana_mainnet",
     "deploy:vana-testnet": "hardhat run scripts/deploy-testnet.ts --network vana_testnet",
     "verify:vana": "hardhat verify --network vana_mainnet",
-    "verify:vana-testnet": "hardhat verify --network vana_testnet"
+    "verify:vana-testnet": "hardhat verify --network vana_testnet",
+    "deploy:local": "hardhat run scripts/deploy.ts",
+    "update-frontend": "hardhat run scripts/update-frontend.ts",
+    "verify:all": "hardhat run scripts/verify-all.ts --network vana_testnet",
+    "set-base-uri": "hardhat run scripts/set-base-uri.ts --network vana_testnet",
+    "set-merkle-root": "hardhat run scripts/set-merkle-root.ts --network vana_testnet",
+    "verify:bytecode": "hardhat run scripts/verify-bytecode.ts --network vana_testnet",
+    "deploy:test": "hardhat run scripts/deploy-test-collection.ts",
+    "deploy:staking": "hardhat run scripts/deploy-staking.ts --network vana_testnet",
+    "deploy:staking:mainnet": "hardhat run scripts/deploy-staking.ts --network vana_mainnet",
+    "upgrade:testnet": "hardhat run scripts/upgrade-contracts.ts --network vana_testnet",
+    "upgrade:mainnet": "hardhat run scripts/upgrade-contracts.ts --network vana_mainnet",
+    "deploy:serica:testnet": "hardhat run scripts/serica/deploy.ts --network vana_testnet",
+    "deploy:serica:mainnet": "hardhat run scripts/serica/deploy.ts --network vana_mainnet"
   },
   "keywords": [],
   "author": "",
@@ -26,7 +40,7 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
-    "@openzeppelin/hardhat-upgrades": "^3.0.0",
+    "@openzeppelin/contracts": "^4.9.6",
     "@types/chai": "^4.3.7",
     "@types/mocha": "^10.0.0",
     "@types/node": "^20.0.0",
@@ -37,10 +51,13 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.9.3",
-    "@openzeppelin/contracts-upgradeable": "^4.9.3",
+    "@openzeppelin/contracts-upgradeable": "4.9.6",
+    "@openzeppelin/hardhat-upgrades": "3.0.0",
     "ethers": "^6.1.0",
-    "react-icons": "^5.4.0"
+    "merkletreejs": "^0.4.1",
+    "react-icons": "^5.4.0",
+    "viem": "^2.21.58",
+    "wagmi": "^2.14.6"
   },
   "overrides": {
     "glob": "^9.0.0"
