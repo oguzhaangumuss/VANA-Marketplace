@@ -39,17 +39,9 @@ npx hardhat run scripts/deploy.ts --network <network>
 
 ## Contract Addresses
 
-- Mainnet: `TBD`
-- Testnet: `TBD`
+- Mainnet: `0x8C8788f98385F6ba1adD4234e551ABba0f82Cb7C`
+- Testnet: `0x8C8788f98385F6ba1adD4234e551ABba0f82Cb7C`
 
-## Documentation
 
-See the [docs](./docs) folder for detailed documentation.
 
-## Security
 
-This project is audited by [Audit Firm]. See the [audit report](./audit/report.pdf).
-
-## License
-
-MIT
