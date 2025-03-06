@@ -119,14 +119,8 @@ This project implements best practices for blockchain security:
 MIT License
 
 ## Contact
-
-
 [![linkedin](https://img.shields.io/badge/Linkedin-000000?style=for-the-badge&logo=Linkedin&logoColor=white)](https://www.linkedin.com/in/oğuzhan-gümüş-755739197/)
 [![Twitter](https://img.shields.io/badge/Twitter-000000?style=for-the-badge&logo=Twitter&logoColor=white)](https://twitter.com/ozziecrypt)
 [![Github](https://img.shields.io/badge/Github-000000?style=for-the-badge&logo=Github&logoColor=white)](https://github.com/oguzhaangumuss)
 [![Email](https://img.shields.io/badge/email-000000?style=for-the-badge&logo=email&logoColor=white)](oguzhaangumuss@gmail.com) 
 
-
-
-
-For technical inquiries about this project, please contact the development team at [contact information].
