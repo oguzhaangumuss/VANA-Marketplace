@@ -114,9 +114,6 @@ This project implements best practices for blockchain security:
 - Regular security audits
 - Pausable functions for emergency response
 
-## License
-
-MIT License
 
 ## Contact
 [![linkedin](https://img.shields.io/badge/Linkedin-000000?style=for-the-badge&logo=Linkedin&logoColor=white)](https://www.linkedin.com/in/oğuzhan-gümüş-755739197/)
